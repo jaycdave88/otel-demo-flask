@@ -1,0 +1,89 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+  
+  filelog:
+    include: [ /var/log/pods/*/*/*.log ]
+    exclude: [ ]
+    start_at: beginning
+    operators:
+      - type: router
+        id: get-format
+        routes:
+          - output: parser-docker
+            expr: 'body matches "^\\{"'
+      - type: json_parser
+        id: parser-docker
+        output: extract_metadata
+        timestamp:
+          parse_from: time
+          layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+      - type: metadata
+        id: extract_metadata
+        attributes:
+          container.name: CONTAINER_NAME
+          pod.name: POD_NAME
+          namespace.name: NAMESPACE_NAME
+
+  # eBPF profiling receiver
+  ebpf:
+    endpoint: unix:///sys/kernel/debug/tracing
+    sampling:
+      interval: 10s
+      duration: 1s
+
+processors:
+  batch:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1000
+    spike_limit_mib: 200
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: demo
+        action: upsert
+
+exporters:
+  # Example exporters - uncomment and configure as needed
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+  
+  logging:
+    loglevel: debug
+  
+  # Datadog exporter example
+  datadog:
+    api:
+      key: "${DD_API_KEY}"
+      site: datadoghq.com
+  
+  # OTLP exporter example for other backends
+  otlp:
+    endpoint: "${OTLP_ENDPOINT}"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, memory_limiter, resource]
+      exporters: [logging] # Add your chosen exporter
+    
+    metrics:
+      receivers: [otlp]
+      processors: [batch, memory_limiter, resource]
+      exporters: [prometheus, logging] # Add your chosen exporter
+    
+    logs:
+      receivers: [otlp, filelog]
+      processors: [batch, memory_limiter, resource]
+      exporters: [logging] # Add your chosen exporter
+    
+    profiles:
+      receivers: [otlp, ebpf]
+      processors: [batch, resource]
+      exporters: [logging] # Add your chosen exporter

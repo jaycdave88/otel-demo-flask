@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-logging
+opentelemetry-instrumentation-sqlalchemy
+opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-instrumentation-system-metrics
+opentelemetry-instrumentation

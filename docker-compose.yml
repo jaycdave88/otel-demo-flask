@@ -1,0 +1,54 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Sample application - Python FastAPI service
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=demoapp
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo123
+      - OTEL_SERVICE_NAME=demo-app
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_PYTHON_LOG_CORRELATION=true
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=demo
+    depends_on:
+      - db
+      - otel-collector
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug:ro  # For eBPF access
+    privileged: true  # Required for eBPF profiling
+
+  # PostgreSQL Database
+  db:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_DB=demoapp
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - /sys/kernel/debug:/sys/kernel/debug:ro  # For eBPF access
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Prometheus metrics exposition
+    privileged: true  # Required for eBPF profiling
+
+volumes:
+  postgres_data:
